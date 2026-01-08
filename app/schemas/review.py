@@ -39,7 +39,7 @@ class ReviewResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class ReviewSummary(BaseModel):
+class ReviewOut(BaseModel):
     id: int
     reviewer : ReviewerOut
     overall_comment: str
@@ -49,3 +49,7 @@ class ReviewSummary(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ReviewListResponse(BaseModel):
+    submission_id: int
+    reviews: list[ReviewOut]
