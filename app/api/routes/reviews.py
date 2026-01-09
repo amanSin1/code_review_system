@@ -10,6 +10,9 @@ from app.models.review import Review
 from sqlalchemy import func
 from app.schemas.review import ReviewCreate, ReviewResponse
 from app.schemas.review import ReviewListResponse
+from app.core.logger import logger
+
+
 router = APIRouter(
     prefix = "/api/reviews",
     tags = ["Reviews"]
@@ -69,6 +72,9 @@ def create_review(
     # ONE commit
     db.commit()
     db.refresh(review)
+    logger.info(
+        f"Review {review.id} created for submission {submission.id} by mentor {current_user.id}"
+    )
 
     return review
 

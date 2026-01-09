@@ -17,7 +17,7 @@ def serialize_reviews(reviews):
                 "id" : review.reviewer.id,
                 "name" : review.reviewer.name
             },
-            "overall_commnets" : review.overall_comment,
+            "overall_comments" : review.overall_comment,
             "rating": review.rating,
             "created_at" : review.createrd_at,
             "annotations" : serialize_annotations(review.annotations)

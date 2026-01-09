@@ -10,9 +10,11 @@ from app.models.user import User
 from app.models.review import Review
 from sqlalchemy import func
 from app.schemas.submission import SubmissionUpdate, SubmissionResponse
-
+from app.utils.validators import sanitize_text, validate_code_content
 from app.api.routes.helpers import serialize_submission
-
+from fastapi import Query
+from sqlalchemy.orm import joinedload
+from app.core.logger import logger
 router = APIRouter(
     prefix = "/api/submissions",
     tags = ["Submissions"]
@@ -21,7 +23,15 @@ router = APIRouter(
 @router.post("/", status_code = status.HTTP_201_CREATED)
 def create_submission(payload: SubmissionCreate, db : Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.role != "student":
+        logger.warning(
+            f"User {current_user.id} attempted to create a submission but is not a student."
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only students can create submissions.")
+    
+    title = sanitize_text(payload.title, max_length=200)
+    description = sanitize_text(payload.description, max_length=2000)
+    code_content = validate_code_content(payload.code_content)
+    
     submission = Submission(
         user_id = current_user.id,
         title = payload.title,
@@ -32,6 +42,9 @@ def create_submission(payload: SubmissionCreate, db : Session = Depends(get_db),
     db.add(submission)
     db.commit()
     db.refresh(submission)
+    logger.info(
+        f"Submission created: submission_id={submission.id}, user_id={current_user.id}"
+    )
 
     tag_names = []
     for tag_name in payload.tags:
@@ -45,6 +58,7 @@ def create_submission(payload: SubmissionCreate, db : Session = Depends(get_db),
         db.add(link)
         tag_names.append(tag.name)
     db.commit()
+    
     return{
         "id" : submission.id,
         "user_id" : submission.user_id,
@@ -61,6 +75,10 @@ def create_submission(payload: SubmissionCreate, db : Session = Depends(get_db),
 
 @router.get("/", status_code=status.HTTP_200_OK)
 def get_submissions(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(10, ge=1, le=100, description="Number of records to return"),
+    status_filter: str = Query(None, description="Filter by status: pending, reviewed"),
+    language: str = Query(None, description="Filter by language"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -78,7 +96,18 @@ def get_submissions(
     if current_user.role == "student":
         query = query.filter(Submission.user_id == current_user.id)
 
-    results = query.all()
+    # Apply filters
+    if status_filter:
+        query = query.filter(Submission.status == status_filter)
+    
+    if language:
+        query = query.filter(Submission.language == language)
+
+    total = query.count()
+
+    # Apply pagination
+    results = query.offset(skip).limit(limit).all()
+
 
     submissions = []
 
@@ -108,10 +137,13 @@ def get_submissions(
 
     return {
         "submissions": submissions,
-        "total": len(submissions),
-        "page": 1,
-        "pages": 1
+        "total": total,
+        "page": (skip // limit) + 1,
+        "pages": (total + limit - 1) // limit,
+        "showing": len(submissions)
     }
+
+
 
 
 @router.get("/{id}")
@@ -120,14 +152,26 @@ def get_submission(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    submission = db.query(Submission).filter(
-        Submission.id == id
-    ).first()
+    # Eager load related data to avoid N+1 queries
+    submission = (
+        db.query(Submission)
+        .options(
+            joinedload(Submission.user),
+            joinedload(Submission.tags),
+            joinedload(Submission.reviews).joinedload(Review.reviewer),
+            joinedload(Submission.reviews).joinedload(Review.annotations)
+        )
+        .filter(Submission.id == id)
+        .first()
+    )
 
     if not submission:
         raise HTTPException(status_code=404, detail="Submission not found")
 
     if current_user.role == "student" and submission.user_id != current_user.id:
+        logger.warning(
+            f"User {current_user.id} attempted to access submission {id} but is not the owner."
+        )
         raise HTTPException(status_code=403, detail="Not authorized")
 
     return serialize_submission(submission)
@@ -170,6 +214,10 @@ def update_submission(
     # Persist changes
     db.commit()
     db.refresh(submission)
+    logger.info(
+    f"Submission {id} updated by user {current_user.id}"
+    )
+
 
     return submission
 
