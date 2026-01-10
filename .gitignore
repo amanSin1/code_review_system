@@ -1,31 +1,74 @@
+# =====================
+# Virtual Environments
+# =====================
 venv/
 env/
 ENV/
 
+# =====================
 # Python
+# =====================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 
-# Environment variables
+# =====================
+# Environment Variables
+# =====================
 .env
 .env.local
+.env.docker
 
+# =====================
 # Database
+# =====================
 *.db
 *.sqlite3
 
-# IDE
+# =====================
+# Logs
+# =====================
+*.log
+logs/
+
+# =====================
+# Testing
+# =====================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =====================
+# Build Artifacts
+# =====================
+build/
+dist/
+*.egg-info/
+
+# =====================
+# Docker
+# =====================
+docker-compose.override.yml
+*.pid
+
+# =====================
+# IDE / Editor
+# =====================
 .vscode/
 .idea/
 *.swp
 *.swo
 
+# =====================
 # OS
+# =====================
 .DS_Store
 Thumbs.db
 
+# =====================
 # Alembic
+# =====================
 alembic/versions/*.pyc
+alembic/versions/__pycache__/
