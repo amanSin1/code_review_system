@@ -54,6 +54,15 @@ docker-compose.override.yml
 *.pid
 
 # =====================
+# Frontend (React / Vite)
+# =====================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/npm-debug.log*
+frontend/yarn-error.log*
+
+# =====================
 # IDE / Editor
 # =====================
 .vscode/
