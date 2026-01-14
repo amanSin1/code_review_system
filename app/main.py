@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from app.config import settings
 from app.database import engine
-from app.api.routes import auth,submissions,reviews, tags
+from app.api.routes import ai_analysis, auth,submissions,reviews, tags,analytics
 from app.api.routes import notifications
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -29,6 +29,8 @@ app.include_router(reviews.router)
 app.include_router(notifications.router)
 app.include_router(tags.router)
 app.include_router(videos.router)
+app.include_router(ai_analysis.router)
+app.include_router(analytics.router)
 
 @app.get("/")
 def read_root():

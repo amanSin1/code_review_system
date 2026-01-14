@@ -101,3 +101,27 @@ export async function deleteSubmissionAPI(id) {
     method: 'DELETE'
   });
 }
+
+export async function analyzeCodeWithAI(payload) {
+  return request('/api/ai/analyze', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getAIQuota() {
+  return request('/api/ai/quota');
+}
+
+// Analytics API Functions
+export async function fetchStudentAnalyticsAPI() {
+  return request('/api/analytics/student');
+}
+
+export async function fetchMentorAnalyticsAPI() {
+  return request('/api/analytics/mentor');
+}
+
+export async function fetchAdminAnalyticsAPI() {
+  return request('/api/analytics/admin');
+}

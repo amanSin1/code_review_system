@@ -20,4 +20,6 @@ class User(Base):
     updated_at = Column(TIMESTAMP(timezone=True), nullable= False, server_default=func.now(), onupdate=func.now())
     submissions = relationship("Submission", back_populates="user")
     reviews = relationship("Review", back_populates="reviewer")
+    ai_analysis_usage = relationship("AIAnalysisUsage", back_populates="user", cascade="all, delete-orphan")
+
 

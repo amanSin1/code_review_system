@@ -3,12 +3,12 @@ import { Code2 } from 'lucide-react';
 import { getUser, clearAuth } from './utils/auth';
 import { fetchNotificationsAPI } from './services/api';
 import LoginView from './components/auth/LoginView';
-
 import RegisterView from './components/auth/RegisterView';
 import SubmissionsView from './components/submissions/SubmissionsView';
 import CreateSubmissionView from './components/submissions/CreateSubmissionView';
 import SubmissionDetailView from './components/submissions/SubmissionDetailView';
 import NotificationsView from './components/notifications/NotificationsView';
+import AnalyticsView from './components/analytics/AnalyticsView'; // ADD THIS IMPORT
 import Navbar from './components/layout/Navbar';
 
 function App() {
@@ -182,6 +182,11 @@ function App() {
 
         {currentView === 'notifications' && (
           <NotificationsView notifications={notifications} />
+        )}
+
+        {/* ADD ANALYTICS VIEW HERE */}
+        {currentView === 'analytics' && (
+          <AnalyticsView user={user} />
         )}
       </div>
 

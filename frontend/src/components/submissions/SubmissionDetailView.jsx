@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Star, MessageSquare, Video } from 'lucide-react';
-import { fetchSubmissionAPI, createReviewAPI, updateSubmissionAPI, deleteSubmissionAPI } from '../../services/api';
+import { User, Star, MessageSquare, Video, Sparkles, X, AlertCircle, CheckCircle, Clock } from 'lucide-react'; // Added Sparkles, X, AlertCircle, CheckCircle, Clock
+import { fetchSubmissionAPI, createReviewAPI, updateSubmissionAPI, deleteSubmissionAPI, analyzeCodeWithAI, getAIQuota } from '../../services/api'; // Added analyzeCodeWithAI, getAIQuota
+// import React, { useState, useEffect } from 'react';
+// import { User, Star, MessageSquare, Video } from 'lucide-react';
+// import { fetchSubmissionAPI, createReviewAPI, updateSubmissionAPI, deleteSubmissionAPI } from '../../services/api';
 
 export default function SubmissionDetailView({ submissionId, user, onViewChange, onSubmissionUpdated }) {
   const [submission, setSubmission] = useState(null);
@@ -15,6 +18,12 @@ export default function SubmissionDetailView({ submissionId, user, onViewChange,
     rating: 5,
     annotations: [{ comment_text: '', line_number: '' }]
   });
+
+  // AI Analysis States
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiQuota, setAiQuota] = useState(null);
 
   useEffect(() => {
     loadSubmission();
@@ -151,6 +160,76 @@ export default function SubmissionDetailView({ submissionId, user, onViewChange,
     }));
   };
 
+  // AI Analysis Functions
+const loadAIQuota = async () => {
+  try {
+    const quota = await getAIQuota();
+    setAiQuota(quota);
+  } catch (err) {
+    console.error('Failed to load AI quota:', err);
+  }
+};
+
+const handleAIAnalysis = async () => {
+  setShowAIModal(true);
+  setAiLoading(true);
+  setAiAnalysis(null);
+
+  try {
+    const payload = {
+      code: submission.code_content,
+      language: submission.language,
+      title: submission.title,
+      description: submission.description
+    };
+
+    const result = await analyzeCodeWithAI(payload);
+    setAiAnalysis(result);
+    
+    // Refresh quota
+    await loadAIQuota();
+  } catch (err) {
+    setAiAnalysis({
+      error: true,
+      message: err.message || 'AI analysis failed. Please try again.'
+    });
+  } finally {
+    setAiLoading(false);
+  }
+};
+
+const closeAIModal = () => {
+  setShowAIModal(false);
+  setAiAnalysis(null);
+};
+
+const getSeverityColor = (severity) => {
+  switch (severity) {
+    case 'critical':
+      return 'bg-red-100 text-red-700 border-red-300';
+    case 'warning':
+      return 'bg-amber-100 text-amber-700 border-amber-300';
+    case 'suggestion':
+      return 'bg-blue-100 text-blue-700 border-blue-300';
+    default:
+      return 'bg-slate-100 text-slate-700 border-slate-300';
+  }
+};
+
+const getSeverityIcon = (severity) => {
+  switch (severity) {
+    case 'critical':
+      return <AlertCircle className="w-4 h-4" />;
+    case 'warning':
+      return <Clock className="w-4 h-4" />;
+    case 'suggestion':
+      return <CheckCircle className="w-4 h-4" />;
+    default:
+      return null;
+  }
+};
+
+
   if (!submission) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -279,10 +358,46 @@ export default function SubmissionDetailView({ submissionId, user, onViewChange,
             />
           </div>
         ) : (
-          <div className="bg-slate-900 rounded-xl p-6 overflow-auto">
-            <pre className="text-slate-100 text-sm font-mono whitespace-pre-wrap">
-              {submission.code_content}
-            </pre>
+          <div>
+            {/* AI Review Button - Only for students viewing their own submissions */}
+            {user.role === 'student' && user.id === submission.user?.id && (
+              <div className="mb-4 flex items-center justify-between bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-900">AI Code Review</p>
+                    <p className="text-sm text-slate-600">
+                      Get instant feedback on your code
+                      {aiQuota && (
+                        <span className="ml-2 text-purple-600">
+                          ({aiQuota.remaining_today}/{aiQuota.total_limit} left today)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleAIAnalysis}
+                  disabled={aiQuota && aiQuota.remaining_today === 0}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 ${
+                    aiQuota && aiQuota.remaining_today === 0
+                      ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg hover:scale-105'
+                  }`}
+                >
+                  <Sparkles className="w-5 h-5" />
+                  <span>{aiQuota && aiQuota.remaining_today === 0 ? 'Quota Exhausted' : 'Analyze Code'}</span>
+                </button>
+              </div>
+            )}
+
+            <div className="bg-slate-900 rounded-xl p-6 overflow-auto">
+              <pre className="text-slate-100 text-sm font-mono whitespace-pre-wrap">
+                {submission.code_content}
+              </pre>
+            </div>
           </div>
         )}
       </div>
@@ -465,6 +580,154 @@ export default function SubmissionDetailView({ submissionId, user, onViewChange,
             >
               Submit Review
             </button>
+          </div>
+        </div>
+      )}
+      {/* AI Analysis Modal */}
+      {showAIModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-slide-up">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-6 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-purple-500" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">AI Code Analysis</h2>
+                  <p className="text-purple-100 text-sm">Powered by Gemini AI</p>
+                </div>
+              </div>
+              <button
+                onClick={closeAIModal}
+                className="w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center transition-all"
+              >
+                <X className="w-6 h-6 text-white" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {aiLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-500 mb-4"></div>
+                  <p className="text-slate-600 text-lg font-medium">Analyzing your code...</p>
+                  <p className="text-slate-500 text-sm mt-2">This may take a few seconds</p>
+                </div>
+              ) : aiAnalysis?.error ? (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                  <p className="text-red-700 font-semibold mb-2">Analysis Failed</p>
+                  <p className="text-red-600 text-sm">{aiAnalysis.message}</p>
+                </div>
+              ) : aiAnalysis ? (
+                <div className="space-y-6">
+                  {/* Score Card */}
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-slate-600 mb-1">Overall Code Quality</p>
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-1">
+                            {[...Array(10)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-5 h-5 ${
+                                  i < aiAnalysis.overall_score
+                                    ? 'text-yellow-400 fill-current'
+                                    : 'text-slate-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-3xl font-bold text-purple-600">
+                            {aiAnalysis.overall_score}/10
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-slate-600">Analysis Time</p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {aiAnalysis.analysis_time}s
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="bg-white border border-slate-200 rounded-xl p-6">
+                    <h3 className="font-bold text-slate-900 mb-3 flex items-center space-x-2">
+                      <MessageSquare className="w-5 h-5 text-purple-500" />
+                      <span>Summary</span>
+                    </h3>
+                    <p className="text-slate-700 leading-relaxed">{aiAnalysis.summary}</p>
+                  </div>
+
+                  {/* Issues */}
+                  {aiAnalysis.issues && aiAnalysis.issues.length > 0 ? (
+                    <div>
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center space-x-2">
+                        <AlertCircle className="w-5 h-5 text-purple-500" />
+                        <span>Issues Found ({aiAnalysis.issues.length})</span>
+                      </h3>
+                      <div className="space-y-4">
+                        {aiAnalysis.issues.map((issue, idx) => (
+                          <div
+                            key={idx}
+                            className={`border-l-4 rounded-lg p-4 ${getSeverityColor(issue.severity)}`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                {getSeverityIcon(issue.severity)}
+                                <span className="font-semibold capitalize">
+                                  {issue.severity}
+                                </span>
+                                {issue.line && (
+                                  <span className="px-2 py-1 bg-white rounded text-xs font-mono">
+                                    Line {issue.line}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm font-medium mb-2">{issue.message}</p>
+                            <div className="bg-white bg-opacity-50 rounded p-3 text-sm">
+                              <p className="font-medium text-slate-700 mb-1">💡 Suggestion:</p>
+                              <p className="text-slate-600">{issue.suggestion}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+                      <p className="text-green-700 font-semibold">Great job! No issues found.</p>
+                      <p className="text-green-600 text-sm mt-1">Your code looks clean!</p>
+                    </div>
+                  )}
+
+                  {/* Quota Info */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">
+                        Remaining analyses today: <strong>{aiAnalysis.remaining_analyses_today}</strong>
+                      </span>
+                      <button
+                        onClick={handleAIAnalysis}
+                        disabled={aiAnalysis.remaining_analyses_today === 0}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          aiAnalysis.remaining_analyses_today === 0
+                            ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                            : 'bg-purple-500 text-white hover:bg-purple-600'
+                        }`}
+                      >
+                        Re-analyze
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
